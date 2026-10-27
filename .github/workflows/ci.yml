@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    container: swift:5.10-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test
+
+  ios:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for iOS
+        run: xcodebuild build -scheme AffclixSDK -destination 'generic/platform=iOS Simulator'
