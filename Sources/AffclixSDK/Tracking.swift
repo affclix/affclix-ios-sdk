@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(UIKit) && os(iOS)
+import UIKit
+#endif
 #if canImport(AppTrackingTransparency)
 import AppTrackingTransparency
 #endif
@@ -73,8 +76,10 @@ struct SystemTracking: TrackingProvider {
     func requestAuthorization(_ completion: @escaping (TrackingStatus) -> Void) {
         #if canImport(AppTrackingTransparency)
         if #available(iOS 14, *) {
-            ATTrackingManager.requestTrackingAuthorization { _ in
-                DispatchQueue.main.async { completion(self.status) }
+            whenAppIsActive {
+                ATTrackingManager.requestTrackingAuthorization { _ in
+                    DispatchQueue.main.async { completion(self.status) }
+                }
             }
             return
         }
@@ -82,3 +87,23 @@ struct SystemTracking: TrackingProvider {
         DispatchQueue.main.async { completion(.unavailable) }
     }
 }
+
+#if canImport(UIKit) && os(iOS)
+/// iOS answers an ATT request made while the app is not active with
+/// `notDetermined` and shows no prompt, so a call during launch waits.
+private func whenAppIsActive(_ work: @escaping () -> Void) {
+    DispatchQueue.main.async {
+        guard UIApplication.shared.applicationState != .active else { return work() }
+        var token: NSObjectProtocol?
+        token = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in
+            if let t = token { NotificationCenter.default.removeObserver(t) }
+            token = nil
+            work()
+        }
+    }
+}
+#else
+private func whenAppIsActive(_ work: @escaping () -> Void) { work() }
+#endif

@@ -21,7 +21,7 @@ Xcode: **File → Add Package Dependencies…** and enter
 Or in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.0")
+.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.1")
 // target dependency: .product(name: "AffclixSDK", package: "AffclixSDK")
 ```
 
@@ -93,7 +93,7 @@ Affclix.updateConversionValue(12, coarse: .medium)
 |---|---|
 | Install | Reported once on first launch. Marked done only when the MMP accepted it or it is in the offline queue; otherwise the next launch retries. Carries IDFV, the IDFA only with ATT authorization, `att_status`, first-open `install_time`, the Apple Search Ads token (`asa_token`) and any deep-link `click_id`. |
 | Events | `event_id` (UUID) per event — the MMP stores and reports each once, so retries and replays are not counted twice. `txid` for purchases. |
-| Delivery | Retries with backoff on no connection / 429 / 5xx, then an offline queue (file in Application Support, protected until first unlock, excluded from backup) resent at start and on foreground, byte for byte. A `{"success":false}` answer (bad key, signature) is not retried. |
+| Delivery | Each event and the install are saved to a file (Application Support, protected until first unlock, excluded from backups) before the first send and removed once the MMP answers, so closing the app loses nothing. Retries with backoff on no connection / 429 / 5xx; what is left goes out on the next launch, return to the foreground or reconnect, byte for byte. A `{"success":false}` answer (bad key, signature) is not retried. `requestDataDeletion` drops saved events. |
 | Signing | With `appSecret`, `sig` = hex HMAC-SHA256 of the JSON body (CryptoKit). |
 | ATT | `requestTrackingAuthorization`; with `attWaitTimeout` the install waits for the answer. |
 | SKAdNetwork | Registers on first launch (conversion value 0); `updateConversionValue` uses the newest API the OS has (16.1 coarse/lock, 15.4, 14.0). |

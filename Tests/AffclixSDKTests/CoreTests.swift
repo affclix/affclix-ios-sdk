@@ -56,6 +56,61 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(transport.requests.count, 3, "queue is empty")
     }
 
+    func testEventSavedBeforeItsFirstSendSurvivesTheAppClosing() {
+        let box = Sandbox(), transport = MockTransport()
+        transport.respond = { _ in .success(Data(#"{"success":true}"#.utf8)) }
+        let core = box.core(transport)
+        core.start()
+        settle(core)
+        let before = transport.requests.count
+
+        // The app is closed while the first attempt is still out.
+        transport.hold = true
+        core.logEvent("purchase", params: [:], completion: nil)
+        settle(core)
+        let event = transport.requests.last
+        XCTAssertEqual(transport.requests.count, before + 1)
+
+        transport.hold = false
+        let next = box.core(transport)
+        next.start()
+        settle(next)
+        XCTAssertEqual(transport.requests.filter { $0 == event }.count, 2, "resent byte for byte on the next launch")
+        let again = transport.requests.count
+        next.didEnterForeground()
+        settle(next)
+        XCTAssertEqual(transport.requests.count, again, "gone from the queue once answered")
+    }
+
+    func testDataDeletionDropsEventsWaitingToBeSent() {
+        let box = Sandbox(), transport = MockTransport()
+        transport.respond = { _ in .failure(.transient("offline")) }
+        let core = box.core(transport)
+        core.logEvent("purchase", params: [:], completion: nil)
+        settle(core)
+
+        transport.respond = { _ in .success(Data(#"{"success":true,"request_id":"R1"}"#.utf8)) }
+        core.requestDataDeletion(completion: nil)
+        settle(core)
+        let count = transport.requests.count
+        core.didEnterForeground()
+        settle(core)
+        XCTAssertEqual(transport.requests.count, count, "nothing left to send")
+        XCTAssertEqual(transport.requests.last?.url.path, "/m/forget")
+    }
+
+    func testRefusedEventIsNotKept() {
+        let box = Sandbox(), transport = MockTransport()
+        transport.respond = { _ in .success(Data(#"{"success":false,"code":"INVALID_SIGNATURE"}"#.utf8)) }
+        let core = box.core(transport)
+        core.logEvent("purchase", params: [:], completion: nil)
+        settle(core)
+        let count = transport.requests.count
+        core.didEnterForeground()
+        settle(core)
+        XCTAssertEqual(transport.requests.count, count, "a refusal is not retried")
+    }
+
     func testRefusedInstallRetriedNextStart() {
         let box = Sandbox(), transport = MockTransport()
         transport.respond = { _ in .success(Data(#"{"success":false,"code":"INVALID_APP_KEY"}"#.utf8)) }

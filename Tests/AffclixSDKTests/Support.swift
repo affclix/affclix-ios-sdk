@@ -6,6 +6,8 @@ final class MockTransport: Transport {
     private let lock = NSLock()
     private var _requests: [PreparedRequest] = []
     var respond: (PreparedRequest) -> Result<Data, DeliveryError> = { _ in .success(Data(#"{"success":true}"#.utf8)) }
+    /// Records requests and never answers, like a send cut off by the app closing.
+    var hold = false
 
     var requests: [PreparedRequest] {
         lock.lock(); defer { lock.unlock() }
@@ -16,8 +18,9 @@ final class MockTransport: Transport {
         lock.lock()
         _requests.append(request)
         let r = respond
+        let held = hold
         lock.unlock()
-        completion(r(request))
+        if !held { completion(r(request)) }
     }
 }
 

@@ -23,6 +23,9 @@ final class AffclixCore {
     private let attPollInterval: TimeInterval
 
     private var draining = false
+    /// Saved requests a first send is working on: the drain leaves them alone.
+    private var inFlight = Set<UUID>()
+    private let network = NetworkWatcher()
     /// When the app last went to the background; nil before the first session.
     private var backgroundedAt: Date?
     private var sessionStarted = false
@@ -67,10 +70,19 @@ final class AffclixCore {
                 storage.installTimeMs = nowMs()
                 if config.registerForSKAdNetwork { skan.register() }
             }
-            reportInstallIfNeeded()
-            startSessionIfNeeded(at: now())
+            let launchedAt = now()
+            // The first session and the install wait for the deferred deep
+            // link, so they carry its click.
+            resolveDeferredDeepLinkFirst { [self] in
+                startSessionIfNeeded(at: launchedAt)
+                reportInstallIfNeeded()
+            }
             refreshSKANSchemaIfDue()
             drainQueue()
+            network.start { [weak self] in
+                guard let self = self else { return }
+                self.state.async { self.drainQueue() }
+            }
         }
     }
 
@@ -79,7 +91,7 @@ final class AffclixCore {
     func didEnterForeground() {
         let at = now() // when it happened, not when the queue gets to it
         state.async { [self] in
-            startSessionIfNeeded(at: at)
+            if releaseInstall == nil { startSessionIfNeeded(at: at) }
             drainQueue()
         }
     }
@@ -107,29 +119,45 @@ final class AffclixCore {
     /// has it or it is in the offline queue; otherwise the next start retries.
     private func reportInstallIfNeeded() {
         guard !storage.installReported else { return }
-        let attDeadline = now().addingTimeInterval(config.attWaitTimeout)
-        resolveDeferredDeepLinkFirst { [self] in
-            waitForTrackingAnswer(deadline: attDeadline, then: sendInstall)
-        }
+        waitForTrackingAnswer(deadline: now().addingTimeInterval(config.attWaitTimeout), then: sendInstall)
     }
 
     private func sendInstall() {
         var p = basePayload()
         p["event"] = "install"
         if let token = tracking.searchAdsToken() { p["asa_token"] = token }
-        let request = prepare(p)
+        send(prepare(p), saved: { self.storage.installReported = true }) { out, _ in
+            switch out {
+            case .accepted:
+                self.storage.installReported = true
+                Log.debug("install reported")
+            case .transient:
+                break
+            case .refused(let why):
+                self.storage.installReported = false
+                Log.error("install refused: \(why)")
+            }
+        }
+    }
+
+    /// Sends a request that must survive the app being closed: it is saved
+    /// before the first attempt, and stays saved until the MMP has answered.
+    /// A transient failure leaves it for the next drain. `saved` runs once it
+    /// is on disk; `finished` runs on `state`.
+    private func send(_ request: PreparedRequest, saved: (() -> Void)? = nil,
+                      finished: @escaping (Outcome, Result<Data, DeliveryError>) -> Void) {
+        let id = queue.enqueue(request)
+        if id != nil { saved?() }
+        if let id = id { inFlight.insert(id) }
         sender.send(request) { result in
             self.state.async {
-                switch self.outcome(result) {
-                case .accepted:
-                    self.storage.installReported = true
-                    Log.debug("install reported")
-                    self.drainQueue()
-                case .transient:
-                    if self.queue.enqueue(request) { self.storage.installReported = true }
-                case .refused(let why):
-                    Log.error("install refused: \(why)")
+                let out = self.outcome(result)
+                if let id = id {
+                    self.inFlight.remove(id)
+                    if case .transient = out {} else { self.queue.remove(id) }
                 }
+                finished(out, result)
+                if case .accepted = out { self.drainQueue() }
             }
         }
     }
@@ -141,7 +169,8 @@ final class AffclixCore {
     /// passed — so the install carries the link's click ID. Immediately when
     /// deferred deep linking is off or the lookup already ran.
     private func resolveDeferredDeepLinkFirst(then: @escaping () -> Void) {
-        guard config.deferredDeepLinking != .off, !storage.deferredChecked else { return then() }
+        // Only a first install: an existing user is never asked to allow a paste.
+        guard config.deferredDeepLinking != .off, !storage.deferredChecked, !storage.installReported else { return then() }
         var released = false
         let release = { [self] in
             guard !released else { return }
@@ -244,19 +273,13 @@ final class AffclixCore {
             p["ts"] = nowMs()
             for (k, v) in params { p[k] = jsonValue(v) }
             trackConversionValue(name, params: params)
-            let request = prepare(p)
-            sender.send(request) { result in
-                self.state.async {
-                    let out = self.outcome(result)
-                    if case .transient = out { self.queue.enqueue(request) }
-                    if case .accepted = out { self.drainQueue() }
-                    guard let completion = completion else { return }
-                    DispatchQueue.main.async {
-                        switch out {
-                        case .accepted: completion(.success(eventID))
-                        case .transient(let why): completion(.failure(AffclixError.queued(why)))
-                        case .refused(let why): completion(.failure(AffclixError.refused(why)))
-                        }
+            send(prepare(p)) { out, _ in
+                guard let completion = completion else { return }
+                DispatchQueue.main.async {
+                    switch out {
+                    case .accepted: completion(.success(eventID))
+                    case .transient(let why): completion(.failure(AffclixError.queued(why)))
+                    case .refused(let why): completion(.failure(AffclixError.refused(why)))
                     }
                 }
             }
@@ -335,7 +358,7 @@ final class AffclixCore {
                         self.storage.pushToken = marker
                         Log.debug("push token registered")
                     case .transient:
-                        if self.queue.enqueue(request) { self.storage.pushToken = marker }
+                        if self.queue.enqueue(request) != nil { self.storage.pushToken = marker }
                     case .refused(let why):
                         Log.error("push token refused: \(why)")
                     }
@@ -358,6 +381,7 @@ final class AffclixCore {
             if let v = d.idfv { p["idfv"] = v }
             if let v = tracking.idfa { p["idfa"] = v }
             let request = prepare(p, path: "/m/forget")
+            queue.removeEvents()
             sender.send(request) { result in
                 self.state.async {
                     var answer: Result<String, Error>
@@ -369,7 +393,7 @@ final class AffclixCore {
                         self.storage.clearIdentifiers()
                         answer = .success(id)
                     case .transient(let why):
-                        if self.queue.enqueue(request) {
+                        if self.queue.enqueue(request) != nil {
                             self.storage.clearIdentifiers()
                             answer = .success("queued")
                         } else {
@@ -495,7 +519,7 @@ final class AffclixCore {
     /// Resends queued requests in order, one at a time, until one fails
     /// transiently (the connection is still down) or the queue is empty.
     private func drainQueue() {
-        guard !draining, let entry = queue.entries.first else { return }
+        guard !draining, let entry = queue.entries.first(where: { !inFlight.contains($0.id) }) else { return }
         draining = true
         sender.send(entry.request) { result in
             self.state.async {

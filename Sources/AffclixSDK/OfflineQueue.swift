@@ -40,13 +40,23 @@ final class OfflineQueue {
         return base.appendingPathComponent("Affclix", isDirectory: true)
     }
 
+    /// Saves a request; its ID, or nil when the file could not be written (the
+    /// entry is still held for this run).
     @discardableResult
-    func enqueue(_ request: PreparedRequest) -> Bool {
-        entries.append(Entry(id: UUID(), request: request, attempts: 0))
+    func enqueue(_ request: PreparedRequest) -> UUID? {
+        let id = UUID()
+        entries.append(Entry(id: id, request: request, attempts: 0))
         if entries.count > capacity {
             entries.removeFirst(entries.count - capacity)
         }
-        return persist()
+        return persist() ? id : nil
+    }
+
+    /// Drops saved events and installs, for a data deletion: sent afterwards,
+    /// they would bring back what the user asked to erase.
+    func removeEvents() {
+        entries.removeAll { $0.request.url.path == "/m/ev" }
+        persist()
     }
 
     func remove(_ id: UUID) {

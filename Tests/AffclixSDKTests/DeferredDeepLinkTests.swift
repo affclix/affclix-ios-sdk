@@ -24,6 +24,34 @@ final class DeferredDeepLinkTests: XCTestCase {
 
     static let found = #"{"success":true,"found":true,"click_id":"50001-CLK","deep_link_value":"kol_RIYA10","campaign_id":50001,"affiliate_id":70001}"#
 
+    func testFirstSessionWaitsForTheLinkAndCarriesItsClick() {
+        let box = Sandbox(), transport = Self.transport(Self.found), board = FakePasteboard()
+        board.text = Self.copied
+        var config = Self.config(.automatic)
+        config.autoSessionTracking = true
+        let core = box.core(transport, pasteboard: board, config: config)
+        core.start()
+        settle(core, 0.5)
+
+        XCTAssertEqual(transport.requests.first?.url.path, "/m/dl")
+        let session = transport.requests.first { json($0)["event"] as? String == "session_start" }
+        XCTAssertEqual(session.flatMap { json($0)["click_id"] as? String }, "50001-CLK")
+    }
+
+    func testExistingInstallNeverAsksForThePaste() {
+        let box = Sandbox(), first = Self.transport(Self.found), board = FakePasteboard()
+        let core = box.core(first, pasteboard: board, config: Self.config(.off))
+        core.start()
+        settle(core)
+
+        board.text = Self.copied
+        let second = Self.transport(Self.found)
+        let upgraded = box.core(second, pasteboard: board, config: Self.config(.automatic))
+        upgraded.start()
+        settle(upgraded)
+        XCTAssertFalse(second.requests.contains { $0.url.path == "/m/dl" })
+    }
+
     func testAutomaticResolvesBeforeTheInstall() {
         let box = Sandbox(), transport = Self.transport(Self.found), board = FakePasteboard()
         board.text = Self.copied
