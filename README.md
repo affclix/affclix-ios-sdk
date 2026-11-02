@@ -21,7 +21,7 @@ Xcode: **File → Add Package Dependencies…** and enter
 Or in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.1")
+.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.2")
 // target dependency: .product(name: "AffclixSDK", package: "AffclixSDK")
 ```
 
@@ -34,7 +34,7 @@ import AffclixSDK
 Affclix.start(AffclixConfig(
     appKey: "<app key from the dashboard>",
     appSecret: "<SDK signing secret>",          // optional; enables sig=
-    trackingDomain: "acme.affclix.org",          // or your custom domain
+    // trackingDomain defaults to "mmp.affclix.org"; set it only for a custom domain
     attWaitTimeout: 60,                          // hold the install up to 60 s for the ATT answer
     enableTCFDataCollection: true,               // read your CMP's IABTCF_* values
     onDeepLink: { link in route(link.deepLinkValue) },  // link.isDeferred on first launch
@@ -91,7 +91,7 @@ Affclix.updateConversionValue(12, coarse: .medium)
 
 | | |
 |---|---|
-| Install | Reported once on first launch. Marked done only when the MMP accepted it or it is in the offline queue; otherwise the next launch retries. Carries IDFV, the IDFA only with ATT authorization, `att_status`, first-open `install_time`, the Apple Search Ads token (`asa_token`) and any deep-link `click_id`. |
+| Install | Reported once on first launch. A backup restored onto another iPhone brings the SDK's state with it; the SDK notices (the IDFV belongs to the device and is not backed up), starts over and reports the install there. Marked done only when the MMP accepted it or it is in the offline queue; otherwise the next launch retries. Carries IDFV, the IDFA only with ATT authorization, `att_status`, first-open `install_time`, the Apple Search Ads token (`asa_token`) and any deep-link `click_id`. |
 | Events | `event_id` (UUID) per event — the MMP stores and reports each once, so retries and replays are not counted twice. `txid` for purchases. |
 | Delivery | Each event and the install are saved to a file (Application Support, protected until first unlock, excluded from backups) before the first send and removed once the MMP answers, so closing the app loses nothing. Retries with backoff on no connection / 429 / 5xx; what is left goes out on the next launch, return to the foreground or reconnect, byte for byte. A `{"success":false}` answer (bad key, signature) is not retried. `requestDataDeletion` drops saved events. |
 | Signing | With `appSecret`, `sig` = hex HMAC-SHA256 of the JSON body (CryptoKit). |

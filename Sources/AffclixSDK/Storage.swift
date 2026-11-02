@@ -2,7 +2,9 @@ import Foundation
 
 /// The SDK's persisted state, in its own UserDefaults suite. iOS deletes it with
 /// the app, so a reinstall starts over: new visitor ID, install reported again
-/// (the MMP treats a reinstall within its window as the first install).
+/// (the MMP treats a reinstall within its window as the first install). A
+/// backup restored onto another iPhone brings the suite back; see
+/// `resetIfRestored`.
 final class Storage {
     private let defaults: UserDefaults
 
@@ -20,10 +22,37 @@ final class Storage {
         static let skanSchemaFetchedAt = "affclix_skan_schema_fetched_at"
         static let skanProgress = "affclix_skan_progress"
         static let deferredChecked = "affclix_deferred_checked"
+        static let vendorID = "affclix_idfv"
     }
+
+    private static let prefix = "affclix_"
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+    }
+
+    /// An iCloud or Finder backup restored onto another iPhone brings this
+    /// suite with it, so the install would never be reported there. The vendor
+    /// ID (IDFV) belongs to the device and is not in backups, so state recorded
+    /// under another one came from a backup and is dropped. Call before
+    /// anything reads the storage. A nil vendor ID (iOS has none to give yet)
+    /// decides nothing. State saved by SDKs before 0.2.2 has no vendor ID: it
+    /// is kept, and the current one recorded.
+    ///
+    /// - Returns: whether restored state was dropped
+    @discardableResult
+    func resetIfRestored(vendorID: String?) -> Bool {
+        guard let vendorID = vendorID, !vendorID.isEmpty else { return false }
+        let recorded = defaults.string(forKey: Key.vendorID)
+        if recorded == vendorID { return false }
+        let restored = recorded != nil
+        if restored {
+            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Self.prefix) {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.set(vendorID, forKey: Key.vendorID)
+        return restored
     }
 
     /// The SDK's per-install ID (vid), created on first use.

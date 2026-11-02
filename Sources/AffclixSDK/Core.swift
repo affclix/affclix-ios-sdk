@@ -65,6 +65,9 @@ final class AffclixCore {
 
     func start() {
         state.async { [self] in
+            if storage.resetIfRestored(vendorID: device.collect().idfv) {
+                Log.debug("dropped state restored from another device's backup: this is a new install")
+            }
             if storage.installTimeMs == nil {
                 // First open ever.
                 storage.installTimeMs = nowMs()

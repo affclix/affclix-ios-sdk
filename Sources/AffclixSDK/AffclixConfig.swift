@@ -11,7 +11,8 @@ public struct AffclixConfig {
     /// out of source control; like any secret shipped in an app it raises the bar
     /// rather than making extraction impossible.
     public var appSecret: String
-    /// Host of your Affclix domain, e.g. "acme.affclix.org" or "go.yourbrand.com".
+    /// Host that receives the SDK's requests. Defaults to "mmp.affclix.org", the
+    /// host the Affclix console shows; set it only for a custom domain.
     public var trackingDomain: String
 
     /// Seconds the install report waits for the App Tracking Transparency answer
@@ -61,7 +62,7 @@ public struct AffclixConfig {
     public init(
         appKey: String,
         appSecret: String = "",
-        trackingDomain: String,
+        trackingDomain: String = "mmp.affclix.org",
         attWaitTimeout: TimeInterval = 0,
         enableTCFDataCollection: Bool = false,
         registerForSKAdNetwork: Bool = true,

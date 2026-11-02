@@ -6,14 +6,14 @@ import UIKit
 /// Affclix iOS SDK — install and in-app event attribution through the Affclix MMP.
 ///
 /// ```swift
-/// Affclix.start(AffclixConfig(appKey: "…", appSecret: "…", trackingDomain: "acme.affclix.org"))
+/// Affclix.start(AffclixConfig(appKey: "…", appSecret: "…"))
 /// Affclix.logEvent("level_complete", params: ["level": 3])
 /// Affclix.logPurchase(revenue: 4.99, currency: "USD", transactionID: txn.id, eventToken: "purchase")
 /// ```
 ///
 /// All methods are safe to call from any thread; completions run on the main queue.
 public enum Affclix {
-    public static let sdkVersion = "0.2.1"
+    public static let sdkVersion = "0.2.2"
 
     private static let lock = NSLock()
     private static var core: AffclixCore?

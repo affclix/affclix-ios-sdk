@@ -25,9 +25,10 @@ final class MockTransport: Transport {
 }
 
 struct FakeDevice: DeviceInfoProvider {
+    var idfv: String? = "IDFV-1"
     func collect() -> DeviceInfo {
         DeviceInfo(bundleID: "com.game.ios", appVersion: "1.2", appBuild: "34", model: "iPhone15,2",
-                   osVersion: "17.5", locale: "en_US", timezone: "UTC", idfv: "IDFV-1")
+                   osVersion: "17.5", locale: "en_US", timezone: "UTC", idfv: idfv)
     }
 }
 
@@ -67,10 +68,10 @@ struct Sandbox {
     }
 
     func core(_ transport: Transport, tracking: TrackingProvider = FakeTracking(), skan: ConversionValueUpdating = FakeSKAN(),
-              pasteboard: PasteboardProvider = FakePasteboard(),
+              pasteboard: PasteboardProvider = FakePasteboard(), device: DeviceInfoProvider = FakeDevice(),
               config: AffclixConfig = Sandbox.config(), tcf: UserDefaults? = nil,
               now: @escaping () -> Date = Date.init) -> AffclixCore {
-        AffclixCore(config: config, storage: Storage(defaults: defaults), device: FakeDevice(), tracking: tracking,
+        AffclixCore(config: config, storage: Storage(defaults: defaults), device: device, tracking: tracking,
                     skan: skan, pasteboard: pasteboard, tcfDefaults: tcf, transport: transport, queueDirectory: directory,
                     retryBaseDelay: 0.001, attPollInterval: 0.01, now: now)
     }

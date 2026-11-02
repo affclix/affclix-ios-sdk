@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-11-02
+
+### Fixed
+
+- An install restored from an iCloud or Finder backup onto another iPhone is reported as an install. The SDK's saved state came back with the backup, so the install was never sent; state recorded on another device is now dropped on start
+- `trackingDomain` defaults to `mmp.affclix.org`, which serves the SDK routes
+
 ## [0.2.1] - 2026-11-01
 
 ### Fixed
@@ -29,5 +36,6 @@ First public release.
 - Uninstall tracking through APNs
 - Privacy manifest (`PrivacyInfo.xcprivacy`)
 
+[0.2.2]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.2
 [0.2.1]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.1
 [0.2.0]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.0
