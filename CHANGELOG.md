@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.3] - 2026-11-03
+
+### Documentation
+
+- `trackingDomain`: leave it at the default, `mmp.affclix.org`. Your Affclix subdomain and custom tracking domains serve clicks and branded links, not SDK requests, so an app pointed at one of them could not report. No behaviour change
+
 ## [0.2.2] - 2026-11-02
 
 ### Fixed
@@ -36,6 +42,7 @@ First public release.
 - Uninstall tracking through APNs
 - Privacy manifest (`PrivacyInfo.xcprivacy`)
 
+[0.2.3]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.3
 [0.2.2]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.2
 [0.2.1]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.1
 [0.2.0]: https://github.com/affclix/affclix-ios-sdk/releases/tag/0.2.0

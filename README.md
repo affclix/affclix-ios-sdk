@@ -21,7 +21,7 @@ Xcode: **File → Add Package Dependencies…** and enter
 Or in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.2")
+.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.3")
 // target dependency: .product(name: "AffclixSDK", package: "AffclixSDK")
 ```
 
@@ -34,7 +34,8 @@ import AffclixSDK
 Affclix.start(AffclixConfig(
     appKey: "<app key from the dashboard>",
     appSecret: "<SDK signing secret>",          // optional; enables sig=
-    // trackingDomain defaults to "mmp.affclix.org"; set it only for a custom domain
+    // trackingDomain defaults to "mmp.affclix.org" — leave it. Branded links on
+    // your own domain (track.yourbrand.com/l/…) need no SDK setting.
     attWaitTimeout: 60,                          // hold the install up to 60 s for the ATT answer
     enableTCFDataCollection: true,               // read your CMP's IABTCF_* values
     onDeepLink: { link in route(link.deepLinkValue) },  // link.isDeferred on first launch

@@ -11,8 +11,11 @@ public struct AffclixConfig {
     /// out of source control; like any secret shipped in an app it raises the bar
     /// rather than making extraction impossible.
     public var appSecret: String
-    /// Host that receives the SDK's requests. Defaults to "mmp.affclix.org", the
-    /// host the Affclix console shows; set it only for a custom domain.
+    /// Host that receives the SDK's requests. Leave the default,
+    /// "mmp.affclix.org": every app reports there, whatever domain its links use.
+    /// Your Affclix subdomain (acme.affclix.org) and custom tracking domains
+    /// (track.yourbrand.com) serve clicks and branded links, not SDK traffic.
+    /// Change it only for a staging or self-hosted endpoint.
     public var trackingDomain: String
 
     /// Seconds the install report waits for the App Tracking Transparency answer

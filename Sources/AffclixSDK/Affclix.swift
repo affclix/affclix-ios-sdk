@@ -13,7 +13,7 @@ import UIKit
 ///
 /// All methods are safe to call from any thread; completions run on the main queue.
 public enum Affclix {
-    public static let sdkVersion = "0.2.2"
+    public static let sdkVersion = "0.2.3"
 
     private static let lock = NSLock()
     private static var core: AffclixCore?
