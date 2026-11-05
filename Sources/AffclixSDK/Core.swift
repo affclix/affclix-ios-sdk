@@ -438,6 +438,8 @@ final class AffclixCore {
         if let v = result.deepLinkValue { params["deep_link_value"] = v }
         if let v = result.utmSource { params["utm_source"] = v }
         if let v = result.utmCampaign { params["utm_campaign"] = v }
+        // Joins this app open to the web visit that led to it (web + app journeys).
+        if let v = result.webVisitorID { params["web_visitor_id"] = v }
         // Carries the click ID (set above, same queue) for re-engagement.
         logEvent("deep_link", params: params, completion: nil)
         if let cb = config.onDeepLink {
@@ -464,6 +466,8 @@ final class AffclixCore {
             "tz": d.timezone,
             "vid": storage.visitorID,
             "att_status": tracking.status.rawValue,
+            "is_rooted": d.isJailbroken ? 1 : 0,
+            "is_emulator": d.isSimulator ? 1 : 0,
         ]
         if !config.appKey.isEmpty { p["ak"] = config.appKey }
         if let v = d.idfv { p["idfv"] = v }

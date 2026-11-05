@@ -16,6 +16,8 @@ public struct DeepLinkResult {
     /// Resolved on first launch from a link copied before the install
     /// (iOS deferred deep linking), not opened directly.
     public let isDeferred: Bool
+    /// `af_web_id`: the web analytics visitor who tapped the link.
+    public let webVisitorID: String?
 
     /// Query parameter of a copied deferred deep link
     /// (`https://{domain}/l/{app}?afdl=<token>`).
@@ -41,7 +43,9 @@ public struct DeepLinkResult {
         }
         let clickID = take("click_id", "clickid", "affclix_click_id")
         let deepLinkValue = take("deep_link_value", "deep_link")
-        let known: Set<String> = ["click_id", "clickid", "affclix_click_id", "deep_link_value", "deep_link",
+        let webVisitorID = take("af_web_id").map { String($0.trimmingCharacters(in: .whitespaces).prefix(128)) }
+            .flatMap { $0.isEmpty || $0.hasPrefix("{") ? nil : $0 }
+        let known: Set<String> = ["click_id", "clickid", "affclix_click_id", "deep_link_value", "deep_link", "af_web_id",
                                   "utm_source", "utm_medium", "utm_campaign", deferredParam]
         return DeepLinkResult(
             url: url,
@@ -51,7 +55,8 @@ public struct DeepLinkResult {
             utmMedium: params["utm_medium"],
             utmCampaign: params["utm_campaign"],
             parameters: params.filter { !known.contains($0.key) },
-            isDeferred: deferred
+            isDeferred: deferred,
+            webVisitorID: webVisitorID
         )
     }
 }

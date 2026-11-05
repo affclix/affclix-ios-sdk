@@ -17,6 +17,10 @@ struct DeviceInfo {
     var timezone: String
     /// Vendor ID: stable per vendor while one of its apps is installed.
     var idfv: String?
+    /// Signs of a jailbreak (sent as is_rooted, for validation rules).
+    var isJailbroken = false
+    /// Running in the iOS Simulator (sent as is_emulator).
+    var isSimulator = false
 }
 
 protocol DeviceInfoProvider {
@@ -40,9 +44,34 @@ struct SystemDeviceInfo: DeviceInfoProvider {
             osVersion: osVersion,
             locale: Locale.current.identifier,
             timezone: TimeZone.current.identifier,
-            idfv: idfv
+            idfv: idfv,
+            isJailbroken: Self.jailbroken,
+            isSimulator: Self.simulator
         )
     }
+
+    #if targetEnvironment(simulator)
+    static let simulator = true
+    #else
+    static let simulator = false
+    #endif
+
+    /// Worked out once per process: files a jailbreak leaves behind, or a
+    /// sandbox that lets the app write outside its container.
+    static let jailbroken: Bool = {
+        #if os(iOS) && !targetEnvironment(simulator)
+        let paths = ["/Applications/Cydia.app", "/Applications/Sileo.app", "/var/jb",
+                     "/Library/MobileSubstrate/MobileSubstrate.dylib", "/usr/sbin/sshd",
+                     "/bin/bash", "/etc/apt", "/private/var/lib/apt/"]
+        if paths.contains(where: { FileManager.default.fileExists(atPath: $0) }) { return true }
+        let probe = "/private/affclix_jb_probe.txt"
+        if (try? "x".write(toFile: probe, atomically: true, encoding: .utf8)) != nil {
+            try? FileManager.default.removeItem(atPath: probe)
+            return true
+        }
+        #endif
+        return false
+    }()
 
     /// "iPhone15,2" — the hardware identifier, not the marketing name.
     private func hardwareModel() -> String {

@@ -21,7 +21,7 @@ Xcode: **File → Add Package Dependencies…** and enter
 Or in `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.3")
+.package(url: "https://github.com/affclix/affclix-ios-sdk.git", from: "0.2.4")
 // target dependency: .product(name: "AffclixSDK", package: "AffclixSDK")
 ```
 

@@ -174,6 +174,23 @@ final class CoreTests: XCTestCase {
         XCTAssertNotEqual(events[0]["event_id"] as? String, eventID, "each event gets its own event_id")
     }
 
+    func testDeepLinkSendsTheWebVisitorAndDeviceFlags() {
+        let box = Sandbox(), transport = MockTransport()
+        let core = box.core(transport)
+        let link = URL(string: "https://acme.affclix.org/l/com.game?click_id=CLK&af_web_id=wv-42")!
+        let result = core.handleDeepLink(link)
+        XCTAssertEqual(result.webVisitorID, "wv-42")
+        XCTAssertEqual(result.parameters, [:], "af_web_id is not an app parameter")
+        settle(core)
+
+        let ev = transport.requests.map(json).first { $0["event"] as? String == "deep_link" }
+        XCTAssertEqual(ev?["web_visitor_id"] as? String, "wv-42")
+        XCTAssertEqual(ev?["app_version"] as? String, "1.2")
+        XCTAssertEqual(ev?["is_rooted"] as? Int, 0)
+        XCTAssertEqual(ev?["is_emulator"] as? Int, 0)
+        XCTAssertNil(DeepLinkResult.parse(URL(string: "https://a.b/l/x?af_web_id=%7Bweb_id%7D")!).webVisitorID)
+    }
+
     func testConsentInPayload() {
         let box = Sandbox(), transport = MockTransport()
         let core = box.core(transport)

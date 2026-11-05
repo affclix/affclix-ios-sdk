@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.4] - 2026-11-05
+
+### Added
+
+- `is_rooted` (signs of a jailbreak) and `is_emulator` (the Simulator) are sent with every request, so validation rules can check them on iOS. The jailbreak check runs once per process
+- Web + app journeys: the `af_web_id` of a Universal Link that opens the app is sent as `web_visitor_id` with the `deep_link` event. `DeepLinkResult.webVisitorID` exposes it
+
 ## [0.2.3] - 2026-11-03
 
 ### Documentation
