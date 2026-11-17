@@ -1,0 +1,179 @@
+import Foundation
+
+/// The SDK's persisted state, in its own UserDefaults suite. iOS deletes it with
+/// the app, so a reinstall starts over: new visitor ID, install reported again
+/// (the MMP treats a reinstall within its window as the first install). A
+/// backup restored onto another iPhone brings the suite back; see
+/// `resetIfRestored`.
+final class Storage {
+    private let defaults: UserDefaults
+
+    private enum Key {
+        static let visitorID = "affclix_vid"
+        static let installTime = "affclix_install_time_ms"
+        static let installReported = "affclix_install_reported"
+        static let clickID = "affclix_click_id"
+        static let userID = "affclix_user_id"
+        static let gdprApplies = "affclix_gdpr_applies"
+        static let adUserData = "affclix_ad_user_data"
+        static let adPersonalization = "affclix_ad_personalization"
+        static let pushToken = "affclix_push_token"
+        static let skanSchema = "affclix_skan_schema"
+        static let skanSchemaFetchedAt = "affclix_skan_schema_fetched_at"
+        static let skanProgress = "affclix_skan_progress"
+        static let deferredChecked = "affclix_deferred_checked"
+        static let deferredDelivered = "affclix_deferred_delivered"
+        static let vendorID = "affclix_idfv"
+        static let attribution = "affclix_attribution"
+        static let attestKeyID = "affclix_attest_key_id"
+        static let attestKeyConfirmed = "affclix_attest_key_confirmed"
+    }
+
+    private static let prefix = "affclix_"
+
+    init(defaults: UserDefaults) {
+        self.defaults = defaults
+    }
+
+    /// An iCloud or Finder backup restored onto another iPhone brings this
+    /// suite with it, so the install would never be reported there. The vendor
+    /// ID (IDFV) belongs to the device and is not in backups, so state recorded
+    /// under another one came from a backup and is dropped. Call before
+    /// anything reads the storage. A nil vendor ID (iOS has none to give yet)
+    /// decides nothing. State saved without a vendor ID (earlier builds): it
+    /// is kept, and the current one recorded.
+    ///
+    /// - Returns: whether restored state was dropped
+    @discardableResult
+    func resetIfRestored(vendorID: String?) -> Bool {
+        guard let vendorID = vendorID, !vendorID.isEmpty else { return false }
+        let recorded = defaults.string(forKey: Key.vendorID)
+        if recorded == vendorID { return false }
+        let restored = recorded != nil
+        if restored {
+            for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Self.prefix) {
+                defaults.removeObject(forKey: key)
+            }
+        }
+        defaults.set(vendorID, forKey: Key.vendorID)
+        return restored
+    }
+
+    /// The SDK's per-install ID (vid), created on first use.
+    var visitorID: String {
+        if let v = defaults.string(forKey: Key.visitorID), !v.isEmpty { return v }
+        let id = UUID().uuidString.lowercased()
+        defaults.set(id, forKey: Key.visitorID)
+        return id
+    }
+
+    /// First open, Unix milliseconds.
+    var installTimeMs: Int64? {
+        get { (defaults.object(forKey: Key.installTime) as? NSNumber)?.int64Value }
+        set { defaults.set(newValue.map { NSNumber(value: $0) }, forKey: Key.installTime) }
+    }
+
+    /// The server has the install, or it is in the offline queue.
+    var installReported: Bool {
+        get { defaults.bool(forKey: Key.installReported) }
+        set { defaults.set(newValue, forKey: Key.installReported) }
+    }
+
+    /// The first-launch deferred deep link lookup is over (found or not).
+    var deferredChecked: Bool {
+        get { defaults.bool(forKey: Key.deferredChecked) }
+        set { defaults.set(newValue, forKey: Key.deferredChecked) }
+    }
+
+    /// A deferred deep link reached the app (copied link or the MMP's match):
+    /// at most one per install.
+    var deferredDelivered: Bool {
+        get { defaults.bool(forKey: Key.deferredDelivered) }
+        set { defaults.set(newValue, forKey: Key.deferredDelivered) }
+    }
+
+    /// The App Attest key of this install (DCAppAttestService key ID).
+    var attestKeyID: String? {
+        get { defaults.string(forKey: Key.attestKeyID) }
+        set { defaults.set(newValue, forKey: Key.attestKeyID) }
+    }
+
+    /// The MMP has (or will get, from the queue) the key's attestation.
+    var attestKeyConfirmed: Bool {
+        get { defaults.bool(forKey: Key.attestKeyConfirmed) }
+        set { defaults.set(newValue, forKey: Key.attestKeyConfirmed) }
+    }
+
+    /// Tracker click ID from the last deep link, sent with later events.
+    var clickID: String? {
+        get { defaults.string(forKey: Key.clickID) }
+        set { defaults.set(newValue, forKey: Key.clickID) }
+    }
+
+    /// The push registration last accepted or queued: "hex token|sandbox".
+    var pushToken: String? {
+        get { defaults.string(forKey: Key.pushToken) }
+        set { defaults.set(newValue, forKey: Key.pushToken) }
+    }
+
+    /// The SKAdNetwork conversion-value schema last fetched (nil: none).
+    var skanSchema: SKANSchema? {
+        get { defaults.data(forKey: Key.skanSchema).flatMap { try? JSONDecoder().decode(SKANSchema.self, from: $0) } }
+        set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: Key.skanSchema) }
+    }
+
+    /// When the schema was last asked for (seconds since 1970), answered or not.
+    var skanSchemaFetchedAt: TimeInterval? {
+        get { defaults.object(forKey: Key.skanSchemaFetchedAt) as? TimeInterval }
+        set { defaults.set(newValue, forKey: Key.skanSchemaFetchedAt) }
+    }
+
+    /// The user's progress toward the schema's conversion values.
+    var skanProgress: SKANProgress {
+        get { defaults.data(forKey: Key.skanProgress).flatMap { try? JSONDecoder().decode(SKANProgress.self, from: $0) } ?? SKANProgress() }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.skanProgress) }
+    }
+
+    /// The MMP's attribution of the install, once it has answered.
+    var attribution: AttributionResult? {
+        get { defaults.data(forKey: Key.attribution).flatMap { try? JSONDecoder().decode(AttributionResult.self, from: $0) } }
+        set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: Key.attribution) }
+    }
+
+    var userID: String? {
+        get { defaults.string(forKey: Key.userID) }
+        set { defaults.set(newValue, forKey: Key.userID) }
+    }
+
+    /// Forgets the user's identifiers (visitor ID, click ID, user ID, push token,
+    /// consent) but not the install state, so the next launch is not reported
+    /// as a new install.
+    func clearIdentifiers() {
+        for key in [Key.visitorID, Key.clickID, Key.userID, Key.pushToken, Key.attribution,
+                    Key.gdprApplies, Key.adUserData, Key.adPersonalization] {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
+    /// Consent the app set explicitly. Stored as -1 (unset) / 0 / 1.
+    var consent: ConsentData {
+        get {
+            func read(_ key: String) -> Bool? {
+                switch defaults.object(forKey: key) as? Int {
+                case 1: return true
+                case 0: return false
+                default: return nil
+                }
+            }
+            return ConsentData(gdprApplies: read(Key.gdprApplies),
+                               adUserData: read(Key.adUserData),
+                               adPersonalization: read(Key.adPersonalization))
+        }
+        set {
+            func code(_ b: Bool?) -> Int { b.map { $0 ? 1 : 0 } ?? -1 }
+            defaults.set(code(newValue.gdprApplies), forKey: Key.gdprApplies)
+            defaults.set(code(newValue.adUserData), forKey: Key.adUserData)
+            defaults.set(code(newValue.adPersonalization), forKey: Key.adPersonalization)
+        }
+    }
+}
